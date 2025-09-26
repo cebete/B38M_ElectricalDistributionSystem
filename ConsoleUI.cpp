@@ -1,5 +1,8 @@
 ﻿#include "ConsoleUI.h"
+#include <chrono>
+#include <conio.h>
 #include <iostream>
+#include <thread>
 
 // ANSI colors
 namespace term
@@ -10,7 +13,10 @@ namespace term
 	constexpr const char* yellow = "\x1b[33m";
 }
 
-ConsoleUI::ConsoleUI(ElectricalSystem& system) : elec(system) { }
+ConsoleUI::ConsoleUI(ElectricalSystem& system) : elec(system) 
+{
+	elec.setEventSink([this](const std::string& m) { this -> pushLog(m); });
+}
 
 void ConsoleUI::clearScreen() const
 {
@@ -33,6 +39,13 @@ std::string ConsoleUI::coloredStatus(bool powered, const std::string& source) co
 	return std::string(term::green) + "GREEN (" + source + ")" + term::reset;
 }
 
+std::string ConsoleUI::batteryColor(double charge) const
+{
+	if (charge > 50) return std::string(term::green);
+	if (charge > 20) return std::string(term::yellow);
+	return std::string(term::red);
+}
+
 void ConsoleUI::drawPanel() const
 {
 	clearScreen();
@@ -49,7 +62,13 @@ void ConsoleUI::drawPanel() const
 	std::cout << " │ APU GEN   : " << onOff(elec.getAPUGenOnline()) << "\n";
 	std::cout << " │ ENG1 GEN  : " << onOff(elec.getEng1GenOnline()) << "\n";
 	std::cout << " │ ENG2 GEN  : " << onOff(elec.getEng2GenOnline()) << "\n";
-	std::cout << " │ BATTERY   : " << onOff(elec.getBatteryOnline()) << "\n";
+	double charge = elec.getBatteryCharge();
+	if (charge < 0) charge = 0;
+	if (charge > 100) charge = 100;
+
+	std::cout << " │ BATTERY   : "
+		<< onOff(elec.getBatteryOnline())
+		<< batteryColor(charge) << "(" << (int)charge << "%)" << term::reset << "\n";
 
 	std::cout << " ├──────────────────────────────┤\n";
 
@@ -60,39 +79,61 @@ void ConsoleUI::drawPanel() const
 	std::cout << " │ DC BUS 2:   " << coloredStatus(elec.getDC2().isPowered(), elec.getDC2().getPoweredBy()) << "\n";
 	std::cout << " │ STANDBY:    " << coloredStatus(elec.getStandby().isPowered(), elec.getStandby().getPoweredBy()) << "\n";
 
+
 	std::cout <<
-	" ├──────────────────────────────┤\n"
-	" │ STATUS: Use menu to interact │\n"
-	" └──────────────────────────────┘\n\n";
+		" ├──────────────────────────────┤\n"
+		" │ STATUS LOG                   │\n";
+
+	for (const auto& line : log) {
+		std::string clipped = line.substr(0, 28); // keep inside panel width
+		std::cout << " │ " << clipped;
+		// pad to width
+		if (clipped.size() < 28) std::cout << std::string(28 - clipped.size(), ' ');
+		std::cout << " │\n";
+	}
+
+	std::cout << " └──────────────────────────────┘\n\n";
 }
+
+#include <conio.h>  // Windows only (_kbhit, _getch)
 
 void ConsoleUI::showMenu()
 {
-	int choice;
-	do
+	bool running = true;
+
+	while (running)
 	{
-		drawPanel();
-		std::cout <<
-		" 1. Toggle External Power\n"
-		" 2. Toggle APU Gen\n"
-		" 3. Toggle Engine 1 Gen\n"
-		" 4. Toggle Engine 2 Gen\n"
-		" 5. Toggle Battery\n"
-		" 0. Exit\n"
-		"Choice: ";
-		std::cin >> choice;
-
-		switch (choice) 
-		{
-			case 1: elec.toggleExtPower(); break;
-			case 2: elec.toggleAPUGen(); break;
-			case 3: elec.toggleEng1Gen(); break;
-			case 4: elec.toggleEng2Gen(); break;
-			case 5: elec.toggleBattery(); break;
-		}
-
+		// Update electrical logic + battery every second
 		elec.recalculate();
+		elec.updateBattery(1.0);
+
+
+		drawPanel();
+
+		std::cout <<
+			" 1. Toggle External Power\n"
+			" 2. Toggle APU Gen\n"
+			" 3. Toggle Engine 1 Gen\n"
+			" 4. Toggle Engine 2 Gen\n"
+			" 5. Toggle Battery\n"
+			" 0. Exit\n"
+			"Press a number to toggle, or wait...\n";
+
+		// Sleep one second to simulate real time
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+
+		// Non-blocking input handling
+		if (_kbhit()) {
+			int key = _getch();
+			switch (key) {
+				case '1': elec.toggleExtPower();  pushLog(std::string("EXT PWR -> ") + (elec.getExtPowerOnline() ? "ON" : "OFF")); break;
+				case '2': elec.toggleAPUGen();    pushLog(std::string("APU GEN -> ") + (elec.getAPUGenOnline() ? "ON" : "OFF"));   break;
+				case '3': elec.toggleEng1Gen();   pushLog(std::string("ENG1 GEN -> ") + (elec.getEng1GenOnline() ? "ON" : "OFF"));  break;
+				case '4': elec.toggleEng2Gen();   pushLog(std::string("ENG2 GEN -> ") + (elec.getEng2GenOnline() ? "ON" : "OFF"));  break;
+				case '5': elec.toggleBattery();   pushLog(std::string("BATTERY -> ") + (elec.getBatteryOnline() ? "ON" : "OFF"));  break;
+				case '0': running = false; break;
+			}
+		}
 	}
-	while (choice != 0);
 }
 

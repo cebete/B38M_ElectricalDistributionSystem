@@ -11,7 +11,11 @@ ElectricalSystem::ElectricalSystem()
 	  ac2(BusName::AC2),
 	  dc1(BusName::DC1),
 	  dc2(BusName::DC2),
-	  standby(BusName::Standby) { }
+	  standby(BusName::Standby) 
+{
+	battery.initBattery(100.0, 1.0, 2.0);
+	battery.setAvailable(true);   // always physically present
+}
 
 void ElectricalSystem::setExtPower(bool available, bool online)
 {
@@ -43,9 +47,30 @@ void ElectricalSystem::setBattery(bool available, bool online)
 	battery.setOnline(online);
 }
 
+void ElectricalSystem::updateBattery(double deltaSeconds)
+{
+    bool standbyOnBattery = (standby.isPowered() && standby.getPoweredBy() == "BATTERY");
+    bool recharge = (ac1.isPowered() || ac2.isPowered() || extPwr.isOnline() || apuGen.isOnline());
+
+    // 🔑 Always tick the battery if either discharging OR recharging
+    battery.tickBattery(standbyOnBattery, recharge, deltaSeconds);
+
+    if (battery.getCharge() <= 0.0 && standbyOnBattery) {
+        standby.setPowered(false, "");
+        emit("BATTERY DISCHARGED - STANDBY LOST");
+    }
+}
+
 void ElectricalSystem::recalculate()
 {
 	// Simplified priority: EXT > APU > Engine1/Engine2 > Battery
+
+	// --- snapshot previous states
+	const bool prev_ac1 = ac1.isPowered(); const std::string prev_ac1_by = ac1.getPoweredBy();
+	const bool prev_ac2 = ac2.isPowered(); const std::string prev_ac2_by = ac2.getPoweredBy();
+	const bool prev_dc1 = dc1.isPowered(); const std::string prev_dc1_by = dc1.getPoweredBy();
+	const bool prev_dc2 = dc2.isPowered(); const std::string prev_dc2_by = dc2.getPoweredBy();
+	const bool prev_stb = standby.isPowered(); const std::string prev_stb_by = standby.getPoweredBy();
 
 	// AC Bus 1
 	if (extPwr.isOnline()) ac1.setPowered(true, extPwr.name());

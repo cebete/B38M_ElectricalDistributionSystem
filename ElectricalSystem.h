@@ -1,11 +1,16 @@
 #pragma once
-#include <vector>
-#include "PowerSource.h"
 #include "Bus.h"
+#include "PowerSource.h"
+#include <functional>
+#include <vector>
+
+
 
 class ElectricalSystem
 {
 private:
+	void emit(const std::string& msg) const { if (sink) sink(msg); }
+
 	// Power sources
 	PowerSource extPwr;
 	PowerSource apuGen;
@@ -19,8 +24,12 @@ private:
 	Bus dc1;
 	Bus dc2;
 	Bus standby;
-	
+
+	std::function<void(const std::string&)> sink; // event target (UI)
+
 public:
+	void setEventSink(std::function<void(const std:: string&)> s) { sink = std::move(s); }
+
 	ElectricalSystem();
 
 	// Toggle methods
@@ -32,9 +41,11 @@ public:
 
 	// Update bus states
 	void recalculate();
-
 	// For testing
 	void printStatus() const;
+
+	void updateBattery(double deltaSeconds);
+	double getBatteryCharge() const { return battery.getCharge(); }
 
 	// Quick getters for ConsoleUI
 	bool getExtPowerOnline() const { return extPwr.isOnline(); }

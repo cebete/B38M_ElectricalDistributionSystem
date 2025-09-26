@@ -21,3 +21,30 @@ std::string PowerSource::name() const
 	}
 	return "UNKNOWN";
 }
+
+void PowerSource::initBattery(double startPercent, double drain, double recharge)
+{
+	if (type == SourceType::Battery)
+	{
+		chargePercent = startPercent;
+		dischargeRate = drain;
+		rechargeRate = recharge;
+	}
+}
+
+void PowerSource::tickBattery(bool discharging, bool recharging, double deltaSeconds)
+{
+	if (type != SourceType::Battery) return;
+	
+	if (discharging && chargePercent > 0.0)
+	{
+		chargePercent -= dischargeRate * deltaSeconds;
+		if (chargePercent < 0.0) chargePercent = 0.0;
+	}
+
+	if (recharging && chargePercent < 100.0)
+	{
+		chargePercent += rechargeRate * deltaSeconds;
+		if (chargePercent > 100.0) chargePercent = 100.0;
+	}
+}
