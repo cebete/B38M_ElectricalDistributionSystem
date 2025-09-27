@@ -99,41 +99,82 @@ void ConsoleUI::drawPanel() const
 
 void ConsoleUI::showMenu()
 {
-	bool running = true;
+    bool running = true;
 
-	while (running)
-	{
-		// Update electrical logic + battery every second
-		elec.recalculate();
-		elec.updateBattery(1.0);
+    while (running)
+    {
+        // Progress sources + battery each second
+        elec.tickSources(1.0);     // ⬅️ NEW: advance startup timers
+        elec.recalculate();
+        elec.updateBattery(1.0);
 
+        // Draw updated panel
+        drawPanel();
 
-		drawPanel();
+        std::cout <<
+            " 1. Toggle External Power\n"
+            " 2. Start/Stop APU Gen\n"
+            " 3. Start/Stop Engine 1 Gen\n"
+            " 4. Start/Stop Engine 2 Gen\n"
+            " 5. Toggle Battery\n"
+            " 0. Exit\n"
+            "Press a number to toggle, or wait...\n";
 
-		std::cout <<
-			" 1. Toggle External Power\n"
-			" 2. Toggle APU Gen\n"
-			" 3. Toggle Engine 1 Gen\n"
-			" 4. Toggle Engine 2 Gen\n"
-			" 5. Toggle Battery\n"
-			" 0. Exit\n"
-			"Press a number to toggle, or wait...\n";
+        // Sleep one second to simulate real time
+        std::this_thread::sleep_for(std::chrono::seconds(1));
 
-		// Sleep one second to simulate real time
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+        // Non-blocking input handling
+        if (_kbhit()) {
+            int key = _getch();
+            switch (key) {
+                case '1':
+                    elec.toggleExtPower();
+                    pushLog(std::string("EXT PWR -> ") + (elec.getExtPowerOnline() ? "ON" : "OFF"));
+                    break;
 
-		// Non-blocking input handling
-		if (_kbhit()) {
-			int key = _getch();
-			switch (key) {
-				case '1': elec.toggleExtPower();  pushLog(std::string("EXT PWR -> ") + (elec.getExtPowerOnline() ? "ON" : "OFF")); break;
-				case '2': elec.toggleAPUGen();    pushLog(std::string("APU GEN -> ") + (elec.getAPUGenOnline() ? "ON" : "OFF"));   break;
-				case '3': elec.toggleEng1Gen();   pushLog(std::string("ENG1 GEN -> ") + (elec.getEng1GenOnline() ? "ON" : "OFF"));  break;
-				case '4': elec.toggleEng2Gen();   pushLog(std::string("ENG2 GEN -> ") + (elec.getEng2GenOnline() ? "ON" : "OFF"));  break;
-				case '5': elec.toggleBattery();   pushLog(std::string("BATTERY -> ") + (elec.getBatteryOnline() ? "ON" : "OFF"));  break;
-				case '0': running = false; break;
-			}
-		}
-	}
+                case '2':
+                    if (!elec.getAPUGenOnline() && !elec.isAPUStarting()) {
+                        elec.startAPU();    // wrapper → apuGen.beginStartup(5s)
+                        pushLog("APU starting...");
+                    }
+                    else if (elec.getAPUGenOnline()) {
+                        elec.toggleAPUGen();
+                        pushLog("APU GEN OFF");
+                    }
+                    break;
+
+                case '3':
+                    if (!elec.getEng1GenOnline() && !elec.isEng1Starting()) {
+                        elec.startEng1();   // wrapper → eng1Gen.beginStartup(7s)
+                        pushLog("ENG1 spooling up...");
+                    }
+                    else if (elec.getEng1GenOnline()) {
+                        elec.toggleEng1Gen();
+                        pushLog("ENG1 GEN OFF");
+                    }
+                    break;
+
+                case '4':
+                    if (!elec.getEng2GenOnline() && !elec.isEng2Starting()) {
+                        elec.startEng2();   // wrapper → eng2Gen.beginStartup(7s)
+                        pushLog("ENG2 spooling up...");
+                    }
+                    else if (elec.getEng2GenOnline()) {
+                        elec.toggleEng2Gen();
+                        pushLog("ENG2 GEN OFF");
+                    }
+                    break;
+
+                case '5':
+                    elec.toggleBattery();
+                    pushLog(std::string("BATTERY -> ") + (elec.getBatteryOnline() ? "ON" : "OFF"));
+                    break;
+
+                case '0':
+                    running = false;
+                    break;
+            }
+        }
+    }
 }
 

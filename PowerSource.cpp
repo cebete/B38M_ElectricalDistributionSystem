@@ -1,10 +1,29 @@
-#include "PowerSource.h";
+#include "PowerSource.h"
 
 PowerSource::PowerSource(SourceType t)
-	: type(t), available(false), online(false) { }
+	: type(t),
+	starting(false),
+	startupTime(0.0),
+	elapsedStartup(0.0),
+	available(false),
+	online(false),
+	chargePercent(0.0),
+	dischargeRate(0.0),
+	rechargeRate(0.0)
+{
+}
 
 void PowerSource::setAvailable(bool a) { available = a; }
-void PowerSource::setOnline(bool o) { online = o; }
+void PowerSource::setOnline(bool o) {
+	if (o) {
+		// only allow ON if available and not starting
+		if (available && !starting)
+			online = true;
+	}
+	else {
+		online = false;
+	}
+}
 
 bool PowerSource::isAvailable() const { return available; }
 bool PowerSource::isOnline() const { return online; }
@@ -46,5 +65,28 @@ void PowerSource::tickBattery(bool discharging, bool recharging, double deltaSec
 	{
 		chargePercent += rechargeRate * deltaSeconds;
 		if (chargePercent > 100.0) chargePercent = 100.0;
+	}
+}
+
+void PowerSource::beginStartup(double duration)
+{
+	if (!online && !starting)
+	{
+		starting = true;
+		startupTime = duration;
+		elapsedStartup = 0.0;
+	}
+}
+
+void PowerSource::tickStartup(double deltaSeconds)
+{
+	if (starting)
+	{
+		elapsedStartup += deltaSeconds;
+		if (elapsedStartup >= startupTime)
+		{
+			starting = false;
+			online = true;
+		}
 	}
 }

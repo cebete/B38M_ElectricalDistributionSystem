@@ -7,6 +7,10 @@ class PowerSource
 {
 private:
 	SourceType type;
+	bool starting;          // true while spooling up
+	double startupTime;     // required seconds to start
+	double elapsedStartup;  // how many seconds passed
+
 	bool available;   // physically connected/running
 	bool online;      // actually selected to supply power
 
@@ -32,4 +36,8 @@ public:
 	void initBattery(double startPercent = 100.0, double drain = 1.0, double recharge = 2.0);
 	void tickBattery(bool discharging, bool recharging, double deltaSeconds);
 	double getCharge() const { return chargePercent; }
+
+	void beginStartup(double duration);
+	void tickStartup(double deltaSeconds);
+	bool isStarting() const { return starting; }
 };

@@ -41,11 +41,22 @@ public:
 
 	// Update bus states
 	void recalculate();
+
 	// For testing
 	void printStatus() const;
 
 	void updateBattery(double deltaSeconds);
 	double getBatteryCharge() const { return battery.getCharge(); }
+
+	void tickSources(double deltaSeconds);
+
+	void startAPU() { apuGen.beginStartup(5.0); }
+	void startEng1() { eng1Gen.beginStartup(7.0); }
+	void startEng2() { eng2Gen.beginStartup(7.0); }
+
+	bool isAPUStarting() const { return apuGen.isStarting(); }
+	bool isEng1Starting() const { return eng1Gen.isStarting(); }
+	bool isEng2Starting() const { return eng2Gen.isStarting(); }
 
 	// Quick getters for ConsoleUI
 	bool getExtPowerOnline() const { return extPwr.isOnline(); }

@@ -3,18 +3,26 @@
 
 ElectricalSystem::ElectricalSystem()
 	: extPwr(SourceType::External),
-	  apuGen(SourceType::APUGen),
-	  eng1Gen(SourceType::Eng1Gen),
-	  eng2Gen(SourceType::Eng2Gen),
-	  battery(SourceType::Battery),
-	  ac1(BusName::AC1),
-	  ac2(BusName::AC2),
-	  dc1(BusName::DC1),
-	  dc2(BusName::DC2),
-	  standby(BusName::Standby) 
+	apuGen(SourceType::APUGen),
+	eng1Gen(SourceType::Eng1Gen),
+	eng2Gen(SourceType::Eng2Gen),
+	battery(SourceType::Battery),
+	ac1(BusName::AC1),
+	ac2(BusName::AC2),
+	dc1(BusName::DC1),
+	dc2(BusName::DC2),
+	standby(BusName::Standby)
 {
 	battery.initBattery(100.0, 1.0, 2.0);
-	battery.setAvailable(true);   // always physically present
+	battery.setAvailable(true);
+
+	// By default: engines/APU physically exist but not running
+	apuGen.setAvailable(true);   // can be started
+	eng1Gen.setAvailable(true);
+	eng2Gen.setAvailable(true);
+
+	// external power may or may not be available
+	extPwr.setAvailable(true);
 }
 
 void ElectricalSystem::setExtPower(bool available, bool online)
@@ -61,6 +69,13 @@ void ElectricalSystem::updateBattery(double deltaSeconds)
     }
 }
 
+void ElectricalSystem::tickSources(double deltaSeconds)
+{
+	apuGen.tickStartup(deltaSeconds);
+	eng1Gen.tickStartup(deltaSeconds);
+	eng2Gen.tickStartup(deltaSeconds);
+}
+
 void ElectricalSystem::recalculate()
 {
 	// Simplified priority: EXT > APU > Engine1/Engine2 > Battery
@@ -102,7 +117,7 @@ void ElectricalSystem::printStatus() const
 		<< " (by " << ac2.getPoweredBy() << ")\n";
 	std::cout << dc1.getName() << " -> " << (dc1.isPowered() ? "ON" : "OFF")
 		<< " (by " << dc1.getPoweredBy() << ")\n";
-	std::cout << dc2.getName() << " -> " << (ac2.isPowered() ? "ON" : "OFF")
+	std::cout << dc2.getName() << " -> " << (dc2.isPowered() ? "ON" : "OFF")
 		<< " (by " << dc2.getPoweredBy() << ")\n";
 	std::cout << standby.getName() << " -> " << (standby.isPowered() ? "ON" : "OFF")
 		<< " (by " << standby.getPoweredBy() << ")\n";
