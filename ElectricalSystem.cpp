@@ -11,13 +11,15 @@ ElectricalSystem::ElectricalSystem()
 	ac2(BusName::AC2),
 	dc1(BusName::DC1),
 	dc2(BusName::DC2),
-	standby(BusName::Standby)
+	standby(BusName::Standby),
+	btb1("BTB1"),
+	btb2("BTB2")
 {
 	battery.initBattery(100.0, 1.0, 2.0);
 	battery.setAvailable(true);
 
 	// By default: engines/APU physically exist but not running
-	apuGen.setAvailable(true);   // can be started
+	apuGen.setAvailable(true);
 	eng1Gen.setAvailable(true);
 	eng2Gen.setAvailable(true);
 
@@ -60,7 +62,7 @@ void ElectricalSystem::updateBattery(double deltaSeconds)
     bool standbyOnBattery = (standby.isPowered() && standby.getPoweredBy() == "BATTERY");
     bool recharge = (ac1.isPowered() || ac2.isPowered() || extPwr.isOnline() || apuGen.isOnline());
 
-    // 🔑 Always tick the battery if either discharging OR recharging
+    // Always tick the battery if either discharging OR recharging
     battery.tickBattery(standbyOnBattery, recharge, deltaSeconds);
 
     if (battery.getCharge() <= 0.0 && standbyOnBattery) {
@@ -78,35 +80,70 @@ void ElectricalSystem::tickSources(double deltaSeconds)
 
 void ElectricalSystem::recalculate()
 {
-	// Simplified priority: EXT > APU > Engine1/Engine2 > Battery
+    // --- Reset all buses first to avoid stale state ---
+    ac1.setPowered(false, "");
+    ac2.setPowered(false, "");
+    dc1.setPowered(false, "");
+    dc2.setPowered(false, "");
+    standby.setPowered(false, "");
 
-	// --- snapshot previous states
-	const bool prev_ac1 = ac1.isPowered(); const std::string prev_ac1_by = ac1.getPoweredBy();
-	const bool prev_ac2 = ac2.isPowered(); const std::string prev_ac2_by = ac2.getPoweredBy();
-	const bool prev_dc1 = dc1.isPowered(); const std::string prev_dc1_by = dc1.getPoweredBy();
-	const bool prev_dc2 = dc2.isPowered(); const std::string prev_dc2_by = dc2.getPoweredBy();
-	const bool prev_stb = standby.isPowered(); const std::string prev_stb_by = standby.getPoweredBy();
+    // --- Global availability flags ---
+    bool idg1On = eng1Gen.isOnline();
+    bool idg2On = eng2Gen.isOnline();
+    bool apuOn = apuGen.isOnline();
+    bool extOn = extPwr.isOnline();
 
-	// AC Bus 1
-	if (extPwr.isOnline()) ac1.setPowered(true, extPwr.name());
-	else if (apuGen.isOnline()) ac1.setPowered(true, apuGen.name());
-	else if (eng1Gen.isOnline()) ac1.setPowered(true, eng1Gen.name());
-	else ac1.setPowered(false, "");
+    bool anyIDG = idg1On || idg2On;
 
-	// AC Bus 2
-	if (extPwr.isOnline()) ac2.setPowered(true, extPwr.name());
-	else if (apuGen.isOnline()) ac2.setPowered(true, apuGen.name());
-	else if (eng2Gen.isOnline()) ac2.setPowered(true, eng2Gen.name());
-	else ac2.setPowered(false, "");
+    // EXT/APU rule:
+    // - IDG has priority
+    // - If no IDG → APU can power both
+    // - If no IDG and no APU → EXT can power both
+    bool allowAPU = apuOn && !anyIDG;
+    bool allowExt = extOn && !anyIDG && !apuOn;
 
-	// DC Buses via TRUs
-	dc1.setPowered(ac1.isPowered(), ac1.getPoweredBy());
-	dc2.setPowered(ac2.isPowered(), ac2.getPoweredBy());
+    // --- AC Bus 1 ---
+    if (idg1On) {
+        ac1.setPowered(true, eng1Gen.name());
+    }
+    else if (allowAPU) {
+        ac1.setPowered(true, apuGen.name());
+    }
+    else if (allowExt) {
+        ac1.setPowered(true, extPwr.name());
+    }
+    else if (btb1.isClosed() && ac2.isPowered()) {
+        ac1.setPowered(true, ac2.getPoweredBy());
+    }
 
-	// Standby bus: if AC1 powered -> follow AC1, else if battery -> battery, else off
-	if (ac1.isPowered()) standby.setPowered(true, ac1.getPoweredBy());
-	else if (battery.isOnline()) standby.setPowered(true, battery.name());
-	else standby.setPowered(false, "");
+    // --- AC Bus 2 ---
+    if (idg2On) {
+        ac2.setPowered(true, eng2Gen.name());
+    }
+    else if (allowAPU) {
+        ac2.setPowered(true, apuGen.name());
+    }
+    else if (allowExt) {
+        ac2.setPowered(true, extPwr.name());
+    }
+    else if (btb2.isClosed() && ac1.isPowered()) {
+        ac2.setPowered(true, ac1.getPoweredBy());
+    }
+
+    // --- DC Buses (fed from AC via TRUs) ---
+    dc1.setPowered(ac1.isPowered(), ac1.getPoweredBy());
+    dc2.setPowered(ac2.isPowered(), ac2.getPoweredBy());
+
+    // --- Standby bus ---
+    if (ac1.isPowered()) {
+        standby.setPowered(true, ac1.getPoweredBy());
+    }
+    else if (battery.isOnline()) {
+        standby.setPowered(true, battery.name());
+    }
+    else {
+        standby.setPowered(false, "");
+    }
 }
 
 void ElectricalSystem::printStatus() const

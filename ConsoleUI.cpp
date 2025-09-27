@@ -78,6 +78,8 @@ void ConsoleUI::drawPanel() const
 	std::cout << " │ DC BUS 1:   " << coloredStatus(elec.getDC1().isPowered(), elec.getDC1().getPoweredBy()) << "\n";
 	std::cout << " │ DC BUS 2:   " << coloredStatus(elec.getDC2().isPowered(), elec.getDC2().getPoweredBy()) << "\n";
 	std::cout << " │ STANDBY:    " << coloredStatus(elec.getStandby().isPowered(), elec.getStandby().getPoweredBy()) << "\n";
+    std::cout << " │ BTB1:       " << (elec.getBTB1Closed() ? "[CLOSED]" : "[OPEN]") << "\n";
+    std::cout << " │ BTB2:       " << (elec.getBTB2Closed() ? "[CLOSED]" : "[OPEN]") << "\n";
 
 
 	std::cout <<
@@ -117,6 +119,8 @@ void ConsoleUI::showMenu()
             " 3. Start/Stop Engine 1 Gen\n"
             " 4. Start/Stop Engine 2 Gen\n"
             " 5. Toggle Battery\n"
+            " 6. Toggle BTB1\n"
+            " 7. Toggle BTB2\n"
             " 0. Exit\n"
             "Press a number to toggle, or wait...\n";
 
@@ -168,6 +172,16 @@ void ConsoleUI::showMenu()
                 case '5':
                     elec.toggleBattery();
                     pushLog(std::string("BATTERY -> ") + (elec.getBatteryOnline() ? "ON" : "OFF"));
+                    break;
+
+                case '6':
+                    elec.toggleBTB1();
+                    pushLog(std::string("BTB1 -> ") + (elec.getBTB1Closed() ? "CLOSED" : "OPEN"));
+                    break;
+
+                case '7':
+                    elec.toggleBTB2();
+                    pushLog(std::string("BTB2 -> ") + (elec.getBTB2Closed() ? "CLOSED" : "OPEN"));
                     break;
 
                 case '0':

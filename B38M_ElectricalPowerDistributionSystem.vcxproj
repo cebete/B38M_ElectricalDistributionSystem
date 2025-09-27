@@ -125,6 +125,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Bus.cpp" />
+    <ClCompile Include="BusTieBreaker.cpp" />
     <ClCompile Include="ConsoleUI.cpp" />
     <ClCompile Include="ElectricalSystem.cpp" />
     <ClCompile Include="main.cpp" />
@@ -132,6 +133,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bus.h" />
+    <ClInclude Include="BusTieBreaker.h" />
     <ClInclude Include="ConsoleUI.h" />
     <ClInclude Include="ElectricalSystem.h" />
     <ClInclude Include="PowerSource.h" />
